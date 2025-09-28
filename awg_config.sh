@@ -83,9 +83,11 @@ checkAndAddDomainPermanentName() {
 echo "Update list packages..."
 opkg update
 
-# ВАЖНО: Удаляем конфликтующие пакеты в самом начале
-echo "Removing conflicting packages (https-dns-proxy, opera-proxy)..."
-opkg remove https-dns-proxy luci-app-https-dns-proxy opera-proxy --force-removal-of-dependent-packages 2>/dev/null || true
+# КРИТИЧНО: Принудительное удаление конфликтующих пакетов
+echo "Removing conflicting packages..."
+opkg remove https-dns-proxy --force-removal-of-dependent-packages 2>/dev/null || true
+opkg remove luci-app-https-dns-proxy --force-removal-of-dependent-packages 2>/dev/null || true
+opkg remove opera-proxy --force-removal-of-dependent-packages 2>/dev/null || true
 
 checkPackageAndInstall "coreutils-base64" "1"
 
@@ -283,20 +285,24 @@ else
 		DOWNLOAD_DIR="/tmp/podkop"
 		mkdir -p "$DOWNLOAD_DIR"
 		
-		echo "Download podkop packages from your repository..."
-		wget -q -O "$DOWNLOAD_DIR/podkop_v0.5.6-r1_all.ipk" "$URL/podkop_packets/podkop_v0.5.6-r1_all.ipk"
-		wget -q -O "$DOWNLOAD_DIR/luci-app-podkop_v0.5.6-r1_all.ipk" "$URL/podkop_packets/luci-app-podkop_v0.5.6-r1_all.ipk"
-		wget -q -O "$DOWNLOAD_DIR/luci-i18n-podkop-ru_0.5.6.ipk" "$URL/podkop_packets/luci-i18n-podkop-ru_0.5.6.ipk"
+		echo "Downloading podkop packages from your repository..."
+		wget -q -O "$DOWNLOAD_DIR/podkop_v0.5.6-r1_all.ipk" "$URL/podkop_packets/podkop_v0.5.6-r1_all.ipk" || { echo "Failed to download podkop main package"; exit 1; }
+		wget -q -O "$DOWNLOAD_DIR/luci-app-podkop_v0.5.6-r1_all.ipk" "$URL/podkop_packets/luci-app-podkop_v0.5.6-r1_all.ipk" || { echo "Failed to download luci-app"; exit 1; }
+		wget -q -O "$DOWNLOAD_DIR/luci-i18n-podkop-ru_0.5.6.ipk" "$URL/podkop_packets/luci-i18n-podkop-ru_0.5.6.ipk" || { echo "Failed to download i18n"; exit 1; }
 		
+		echo "Installing podkop main package..."
 		opkg install "$DOWNLOAD_DIR/podkop_v0.5.6-r1_all.ipk"
 		if [ $? -eq 0 ]; then
+			echo "Installing luci packages..."
 			opkg install "$DOWNLOAD_DIR/luci-app-podkop_v0.5.6-r1_all.ipk"
 			opkg install "$DOWNLOAD_DIR/luci-i18n-podkop-ru_0.5.6.ipk"
+		else
+			echo "Failed to install main podkop package"
 		fi
 		
 		rm -rf "$DOWNLOAD_DIR"
 		wget -O "$path_podkop_config" "$URL/config_files/podkop"
-		echo "Podkop installed..."
+		echo "Podkop installation completed"
 	fi
 fi
 
@@ -313,11 +319,14 @@ ifup $INTERFACE_NAME
 printf "\033[32;1mService Podkop and Sing-Box restart...\033[0m\n"
 service sing-box enable
 service sing-box restart
+
+# Проверяем наличие сервиса podkop перед запуском
 if [ -f "/etc/init.d/podkop" ]; then
 	service podkop enable
 	service podkop restart
+	echo "Podkop service started"
 else
-	echo "Podkop service not available (package may not have installed correctly)"
+	echo "Podkop service not available - check installation"
 fi
 
 printf "\033[32;1mConfiguration completed...\033[0m\n"
