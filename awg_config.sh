@@ -128,7 +128,7 @@ checkPackageAndInstall()
     if opkg list-installed | grep -q $name; then
         echo "$name already installed..."
     else
-        echo "$name not installed. Installed $name..."
+        echo "$name not installed. Installing $name..."
         opkg install $name
 		res=$?
 		if [ "$isRequried" = "1" ]; then
@@ -173,7 +173,7 @@ checkPackageAndInstall "sing-box" "1"
 if opkg list-installed | grep -q dnsmasq-full; then
 	echo "dnsmasq-full already installed..."
 else
-	echo "Installed dnsmasq-full..."
+	echo "Installing dnsmasq-full..."
 	cd /tmp/ && opkg download dnsmasq-full
 	opkg remove dnsmasq && opkg install dnsmasq-full --cache /tmp/
 
@@ -328,10 +328,12 @@ fi
 
 # Получаем список всех зон
 ZONES=$(uci show firewall | grep "zone$" | cut -d'=' -f1)
+#echo $ZONES
 # Циклически проходим по всем зонам
 for zone in $ZONES; do
   # Получаем имя зоны
   CURR_ZONE_NAME=$(uci get $zone.name)
+  #echo $CURR_ZONE_NAME
   # Проверяем, является ли это зона с именем "$ZONE_NAME"
   if [ "$CURR_ZONE_NAME" = "$ZONE_NAME" ]; then
     # Проверяем, существует ли интерфейс в зоне
@@ -339,6 +341,7 @@ for zone in $ZONES; do
       # Добавляем интерфейс в зону
       uci add_list $zone.network="$INTERFACE_NAME"
       uci commit firewall
+      #echo "Интерфейс '$INTERFACE_NAME' добавлен в зону '$ZONE_NAME'"
     fi
   fi
 done
@@ -349,14 +352,14 @@ if [ -z "$str" ]
 then
   echo "Add block QUIC..."
 
-  uci add firewall rule
+  uci add firewall rule # =cfg2492bd
   uci set firewall.@rule[-1].name='Block_UDP_80'
   uci add_list firewall.@rule[-1].proto='udp'
   uci set firewall.@rule[-1].src='lan'
   uci set firewall.@rule[-1].dest='wan'
   uci set firewall.@rule[-1].dest_port='80'
   uci set firewall.@rule[-1].target='REJECT'
-  uci add firewall rule
+  uci add firewall rule # =cfg2592bd
   uci set firewall.@rule[-1].name='Block_UDP_443'
   uci add_list firewall.@rule[-1].proto='udp'
   uci set firewall.@rule[-1].src='lan'
@@ -370,7 +373,6 @@ printf  "\033[32;1mRestart service dnsmasq, odhcpd...\033[0m\n"
 service dnsmasq restart
 service odhcpd restart
 
-# Обновляем podkop до актуальной версии
 PACKAGE="podkop"
 REQUIRED_VERSION="0.5.6-1"
 
@@ -384,7 +386,7 @@ path_podkop_config="/etc/config/podkop"
 path_podkop_config_backup="/root/podkop"
 
 if [ -f "/etc/init.d/podkop" ]; then
-	printf "Podkop installed. Reconfigured on AmneziaWG and Opera Proxy? (y/n): \n"
+	printf "Podkop installed. Reconfigure for AmneziaWG and Opera Proxy? (y/n): \n"
 	is_reconfig_podkop="y"
 	read is_reconfig_podkop
 	if [ "$is_reconfig_podkop" = "y" ] || [ "$is_reconfig_podkop" = "Y" ]; then
@@ -402,7 +404,6 @@ else
 		DOWNLOAD_DIR="/tmp/podkop"
 		mkdir -p "$DOWNLOAD_DIR"
 		
-		# Скачивание актуальных пакетов podkop 0.5.6 с GitHub
 		echo "Download podkop_v0.5.6-r1_all.ipk..."
 		wget -q -O "$DOWNLOAD_DIR/podkop_v0.5.6-r1_all.ipk" "https://github.com/itdoginfo/podkop/releases/download/v0.5.6/podkop_v0.5.6-r1_all.ipk"
 		
@@ -412,7 +413,6 @@ else
 		echo "Download luci-i18n-podkop-ru_0.5.6.ipk..."
 		wget -q -O "$DOWNLOAD_DIR/luci-i18n-podkop-ru_0.5.6.ipk" "https://github.com/itdoginfo/podkop/releases/download/v0.5.6/luci-i18n-podkop-ru_0.5.6.ipk"
 		
-		# Установка загруженных пакетов
 		opkg install "$DOWNLOAD_DIR/podkop_v0.5.6-r1_all.ipk"
 		opkg install "$DOWNLOAD_DIR/luci-app-podkop_v0.5.6-r1_all.ipk"
 		opkg install "$DOWNLOAD_DIR/luci-i18n-podkop-ru_0.5.6.ipk"
@@ -426,7 +426,6 @@ fi
 printf  "\033[32;1mStart and enable service 'https-dns-proxy'...\033[0m\n"
 manage_package "https-dns-proxy" "enable" "start"
 
-# Удаление старых cron задач
 str=$(grep -i "$URL/configure_zaprets.sh" /etc/crontabs/root)
 if [ ! -z "$str" ]
 then
@@ -437,10 +436,11 @@ fi
 
 printf  "\033[32;1mRestart firewall and network...\033[0m\n"
 service firewall restart
+#service network restart
 
 # Отключаем интерфейс
 ifdown $INTERFACE_NAME
-# Ждем несколько секунд
+# Ждем несколько секунд (по желанию)
 sleep 2
 # Включаем интерфейс
 ifup $INTERFACE_NAME
